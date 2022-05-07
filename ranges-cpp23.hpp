@@ -3128,7 +3128,7 @@ to(R&& r, Args&&... args) {
 }
 
 template<class R>
-struct input_iterator {
+struct input_iter {
   using iterator_category = input_iterator_tag;
   using value_type = range_value_t<R>;
   using difference_type = ptrdiff_t;
@@ -3136,9 +3136,9 @@ struct input_iterator {
   using reference = range_reference_t<R>;
   reference operator*() const;
   pointer operator->() const;
-  input_iterator& operator++();
-  input_iterator operator++(int);
-  bool operator==(const input_iterator&) const;
+  input_iter& operator++();
+  input_iter operator++(int);
+  bool operator==(const input_iter&) const;
 };
 
 template<template<class...> class C, input_range R, class... Args>
@@ -3148,10 +3148,10 @@ to(R&& r, Args&&... args) {
     return to<decltype(C(declval<R>(), declval<Args>()...))>(std::forward<R>(r),
                                                              std::forward<Args>(args)...);
   else if constexpr (requires {
-                       C(declval<input_iterator<R>>(), declval<input_iterator<R>>(),
+                       C(declval<input_iter<R>>(), declval<input_iter<R>>(),
                          declval<Args>()...);
                      })
-    return to<decltype(C(declval<input_iterator<R>>(), declval<input_iterator<R>>(),
+    return to<decltype(C(declval<input_iter<R>>(), declval<input_iter<R>>(),
                          declval<Args>()...))>(std::forward<R>(r), std::forward<Args>(args)...);
 }
 
