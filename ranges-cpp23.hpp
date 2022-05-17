@@ -1657,6 +1657,11 @@ class join_with_view : public view_interface<join_with_view<V, Pattern>> {
 
     friend Parent;
 
+    template<bool OtherConst>
+    constexpr auto equal_to(const iterator<OtherConst>& x) const {
+      return x.outer_it_ == end_;
+    }
+
    public:
     sentinel() = default;
 
@@ -1668,7 +1673,7 @@ class join_with_view : public view_interface<join_with_view<V, Pattern>> {
       requires sentinel_for<sentinel_t<Base>, iterator_t<join_with_view::Base<OtherConst>>>
     friend constexpr bool
     operator==(const iterator<OtherConst>& x, const sentinel& y) {
-      return x.outer_it_ = y.end_;
+      return y.equal_to(x);
     }
   };
 
