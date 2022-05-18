@@ -1494,7 +1494,7 @@ class join_with_view : public view_interface<join_with_view<V, Pattern>> {
       if constexpr (ref_is_glvalue)
         return *x;
       else
-        return parent_->inner_.emplace_deref(x);
+        return parent_->inner_._M_emplace_deref(x);
     }
 
     constexpr auto&&
