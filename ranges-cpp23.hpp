@@ -214,30 +214,8 @@ class zip_view : public view_interface<zip_view<Views...>> {
           [](auto... equals) { return (equals || ...); }, x.current_, y.current_);
     }
 
-    friend constexpr bool
-    operator<(const iterator& x, const iterator& y) requires all_random_access<Const, Views...> {
-      return x.current_ < y.current_;
-    }
-
-    friend constexpr bool
-    operator>(const iterator& x, const iterator& y) requires all_random_access<Const, Views...> {
-      return y < x;
-    }
-
-    friend constexpr bool
-    operator<=(const iterator& x, const iterator& y) requires all_random_access<Const, Views...> {
-      return !(y < x);
-    }
-
-    friend constexpr bool
-    operator>=(const iterator& x, const iterator& y) requires all_random_access<Const, Views...> {
-      return !(x < y);
-    }
-
     friend constexpr auto
-    operator<=>(const iterator& x, const iterator& y) requires(
-      all_random_access<Const, Views...> &&
-      (three_way_comparable<maybe_const_iterator_t<Const, Views>> && ...)) {
+    operator<=>(const iterator& x, const iterator& y) requires all_random_access<Const, Views...> {
       return x.current_ <=> y.current_;
     }
 
@@ -1658,7 +1636,8 @@ class join_with_view : public view_interface<join_with_view<V, Pattern>> {
     friend Parent;
 
     template<bool OtherConst>
-    constexpr auto equal_to(const iterator<OtherConst>& x) const {
+    constexpr auto
+    equal_to(const iterator<OtherConst>& x) const {
       return x.outer_it_ == end_;
     }
 
@@ -1707,7 +1686,7 @@ class join_with_view : public view_interface<join_with_view<V, Pattern>> {
 
   constexpr auto
   begin() const requires input_range<const V> && forward_range<const Pattern> &&
-    is_reference_v<range_reference_t<const V>> {
+    input_range<range_reference_t<const V>> && is_reference_v<range_reference_t<const V>> {
     return iterator<true>{*this, ranges::begin(base_)};
   }
 
@@ -1723,7 +1702,7 @@ class join_with_view : public view_interface<join_with_view<V, Pattern>> {
 
   constexpr auto
   end() const requires input_range<const V> && forward_range<const Pattern> &&
-    is_reference_v<range_reference_t<const V>> {
+    input_range<range_reference_t<const V>> && is_reference_v<range_reference_t<const V>> {
     using InnerConstRng = range_reference_t<const V>;
     if constexpr (forward_range<const V> && forward_range<InnerConstRng> && common_range<const V> &&
                   common_range<InnerConstRng>)
@@ -3153,11 +3132,10 @@ to(R&& r, Args&&... args) {
     return to<decltype(C(declval<R>(), declval<Args>()...))>(std::forward<R>(r),
                                                              std::forward<Args>(args)...);
   else if constexpr (requires {
-                       C(declval<input_iter<R>>(), declval<input_iter<R>>(),
-                         declval<Args>()...);
+                       C(declval<input_iter<R>>(), declval<input_iter<R>>(), declval<Args>()...);
                      })
-    return to<decltype(C(declval<input_iter<R>>(), declval<input_iter<R>>(),
-                         declval<Args>()...))>(std::forward<R>(r), std::forward<Args>(args)...);
+    return to<decltype(C(declval<input_iter<R>>(), declval<input_iter<R>>(), declval<Args>()...))>(
+      std::forward<R>(r), std::forward<Args>(args)...);
 }
 
 }  // namespace std::ranges
