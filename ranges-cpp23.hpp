@@ -548,29 +548,9 @@ class zip_transform_view : public view_interface<zip_transform_view<F, Views...>
       return x.inner_ == y.inner_;
     }
 
-    friend constexpr bool
-    operator<(const iterator& x, const iterator& y) requires random_access_range<Base> {
-      return x.inner_ < y.inner_;
-    }
-
-    friend constexpr bool
-    operator>(const iterator& x, const iterator& y) requires random_access_range<Base> {
-      return x.inner_ > y.inner_;
-    }
-
-    friend constexpr bool
-    operator<=(const iterator& x, const iterator& y) requires random_access_range<Base> {
-      return x.inner_ <= y.inner_;
-    }
-
-    friend constexpr bool
-    operator>=(const iterator& x, const iterator& y) requires random_access_range<Base> {
-      return x.inner_ >= y.inner_;
-    }
-
     friend constexpr auto
-    operator<=>(const iterator& x, const iterator& y) requires random_access_range<Base> &&
-      three_way_comparable<ziperator<Const>> {
+    operator<=>(const iterator& x,
+                const iterator& y) requires three_way_comparable<ziperator<Const>> {
       return x.inner_ <=> y.inner_;
     }
 
@@ -1749,6 +1729,8 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
 
     constexpr explicit outer_iterator(chunk_view& parent) : parent_(addressof(parent)) { }
 
+    friend chunk_view;
+
    public:
     using iterator_concept = input_iterator_tag;
     using difference_type = range_difference_t<V>;
@@ -1933,6 +1915,8 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
     constexpr iterator(Parent* parent, iterator_t<Base> current,
                        range_difference_t<Base> missing = 0)
       : current_(current), end_(ranges::end(parent->base_)), n_(parent->n_), missing_(missing) { }
+
+    friend chunk_view;
 
    public:
     using iterator_category = input_iterator_tag;
@@ -2324,6 +2308,8 @@ class slide_view : public view_interface<slide_view<V>> {
     sentinel_t<V> end_ = sentinel_t<V>();
 
     constexpr explicit sentinel(sentinel_t<V> end) : end_(end) { }
+
+    friend slide_view;
 
    public:
     sentinel() = default;
