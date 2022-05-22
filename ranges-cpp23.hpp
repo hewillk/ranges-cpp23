@@ -549,8 +549,7 @@ class zip_transform_view : public view_interface<zip_transform_view<F, Views...>
     }
 
     friend constexpr auto
-    operator<=>(const iterator& x,
-                const iterator& y) requires three_way_comparable<ziperator<Const>> {
+    operator<=>(const iterator& x, const iterator& y) requires random_access_range<Base> {
       return x.inner_ <=> y.inner_;
     }
 
