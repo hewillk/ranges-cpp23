@@ -1721,14 +1721,28 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
   range_difference_t<V> n_ = 0;
   range_difference_t<V> remainder_ = 0;
 
-  __detail::__non_propagating_cache<iterator_t<V>> current_;
+  std::optional<iterator_t<V>> current_;
 
+  friend class outer_iterator;
   class outer_iterator {
     chunk_view* parent_;
 
     constexpr explicit outer_iterator(chunk_view& parent) : parent_(addressof(parent)) { }
 
     friend chunk_view;
+
+    constexpr bool
+    reach_end() const {
+      return *parent_->current_ == ranges::end(parent_->base_) && parent_->remainder_ != 0;
+    }
+
+    constexpr auto
+    from_end() const {
+      const auto dist = ranges::end(parent_->base_) - *parent_->current_;
+      if (dist < parent_->remainder_)
+        return dist == 0 ? 0 : 1;
+      return div_ceil(dist - parent_->remainder_, parent_->n_) + 1;
+    }
 
    public:
     using iterator_concept = input_iterator_tag;
@@ -1739,12 +1753,26 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
 
       constexpr explicit value_type(chunk_view& parent) : parent_(addressof(parent)) { }
 
+      friend class outer_iterator;
+
      public:
       class inner_iterator {
         chunk_view* parent_;
 
         constexpr explicit inner_iterator(chunk_view& parent) noexcept
           : parent_(addressof(parent)) { }
+
+        constexpr bool
+        reach_end() const {
+          return parent_->remainder_ == 0;
+        }
+
+        constexpr auto
+        from_end() const {
+          return ranges::min(parent_->remainder_, ranges::end(parent_->base_) - *parent_->current_);
+        }
+
+        friend class value_type;
 
        public:
         using iterator_concept = input_iterator_tag;
@@ -1781,14 +1809,13 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
 
         friend constexpr bool
         operator==(const inner_iterator& x, default_sentinel_t) {
-          return x.parent_->remainder_ == 0;
+          return x.reach_end();
         }
 
         friend constexpr difference_type
         operator-(default_sentinel_t y, const inner_iterator& x) requires
           sized_sentinel_for<sentinel_t<V>, iterator_t<V>> {
-          return ranges::min(x.parent_->remainder_,
-                             ranges::end(x.parent_->base_) - *x.parent_->current_);
+          return x.from_end();
         }
 
         friend constexpr difference_type
@@ -1837,17 +1864,13 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
 
     friend constexpr bool
     operator==(const outer_iterator& x, default_sentinel_t) {
-      return *x.parent_->current_ == ranges::end(x.parent_->base_) && x.parent_->remainder_ != 0;
+      return x.reach_end();
     }
 
     friend constexpr difference_type
     operator-(default_sentinel_t y,
               const outer_iterator& x) requires sized_sentinel_for<sentinel_t<V>, iterator_t<V>> {
-      const auto dist = ranges::end(x.parent_->base_) - *x.parent_->current_;
-      if (dist < x.parent_->remainder_)
-        return dist == 0 ? 0 : 1;
-
-      return div_ceil(dist - x.parent_->remainder_, x.parent_->n_) + 1;
+      return x.from_end();
     }
 
     friend constexpr difference_type
