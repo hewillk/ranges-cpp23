@@ -3111,6 +3111,7 @@ to(R&& r, Args&&... args) {
       if constexpr (sized_range<R> && reservable_container<C>)
         c.reserve(ranges::size(r));
       ranges::copy(r, container_inserter<range_reference_t<R>>(c));
+      return c;
     }
   } else if (input_range<range_reference_t<R>>)
     return to<C>(r | views::transform([](auto&& elem) {
