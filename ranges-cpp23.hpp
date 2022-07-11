@@ -1717,8 +1717,8 @@ class chunk_view;
 template<view V>
   requires input_range<V>
 class chunk_view<V> : public view_interface<chunk_view<V>> {
-  V base_ = V();
-  range_difference_t<V> n_ = 0;
+  V base_;
+  range_difference_t<V> n_;
   range_difference_t<V> remainder_ = 0;
 
   std::optional<iterator_t<V>> current_;
@@ -1838,7 +1838,8 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
 
       constexpr auto
       size() const requires sized_sentinel_for<sentinel_t<V>, iterator_t<V>> {
-        return ranges::min(parent_->remainder_, ranges::end(parent_->base_) - *parent_->current_);
+        return __detail::__to_unsigned_like(
+          ranges::min(parent_->remainder_, ranges::end(parent_->base_) - *parent_->current_));
       }
     };
 
@@ -1881,8 +1882,6 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
   };
 
  public:
-  chunk_view() requires(default_initializable<V>) = default;
-
   constexpr explicit chunk_view(V base, range_difference_t<V> n) : base_(std::move(base)), n_(n) { }
 
   constexpr V
@@ -1903,7 +1902,7 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
   }
 
   constexpr default_sentinel_t
-  end() noexcept {
+  end() const noexcept {
     return default_sentinel;
   }
 
@@ -1921,8 +1920,8 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
 template<view V>
   requires forward_range<V>
 class chunk_view<V> : public view_interface<chunk_view<V>> {
-  V base_ = V();
-  range_difference_t<V> n_ = 0;
+  V base_;
+  range_difference_t<V> n_;
 
   template<bool Const>
   class iterator {
@@ -2090,8 +2089,6 @@ class chunk_view<V> : public view_interface<chunk_view<V>> {
   };
 
  public:
-  chunk_view() requires(default_initializable<V>) = default;
-
   constexpr explicit chunk_view(V base, range_difference_t<V> n) : base_(std::move(base)), n_(n) { }
 
   constexpr V
@@ -2166,8 +2163,8 @@ concept slide_caches_first = !slide_caches_nothing<V> && !slide_caches_last<V>;
 template<forward_range V>
   requires view<V>
 class slide_view : public view_interface<slide_view<V>> {
-  V base_ = V();
-  range_difference_t<V> n_ = 0;
+  V base_;
+  range_difference_t<V> n_;
   [[no_unique_address]] __detail::__maybe_present_t<slide_caches_first<V> || slide_caches_last<V>,
                                                     __detail::_CachedPosition<V>>
     cached_begin_;
@@ -2355,8 +2352,6 @@ class slide_view : public view_interface<slide_view<V>> {
   };
 
  public:
-  slide_view() requires(default_initializable<V>) = default;
-
   constexpr explicit slide_view(V base, range_difference_t<V> n) : base_(std::move(base)), n_(n) { }
 
   constexpr auto
@@ -3111,6 +3106,7 @@ to(R&& r, Args&&... args) {
       if constexpr (sized_range<R> && reservable_container<C>)
         c.reserve(ranges::size(r));
       ranges::copy(r, container_inserter<range_reference_t<R>>(c));
+      return c;
     }
   } else if (input_range<range_reference_t<R>>)
     return to<C>(r | views::transform([](auto&& elem) {
