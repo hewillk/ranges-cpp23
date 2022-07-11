@@ -2421,8 +2421,8 @@ namespace std::ranges {
 template<input_range V>
   requires view<V>
 class stride_view : public view_interface<stride_view<V>> {
-  V base_ = V();
-  range_difference_t<V> stride_ = 1;
+  V base_;
+  range_difference_t<V> stride_;
 
   template<bool Const>
   using Base = maybe_const<Const, V>;
@@ -2650,7 +2650,6 @@ class stride_view : public view_interface<stride_view<V>> {
   };
 
  public:
-  stride_view() requires(default_initializable<V>) = default;
   constexpr explicit stride_view(V base, range_difference_t<V> stride)
     : base_(std::move(base)), stride_(stride) { }
 
