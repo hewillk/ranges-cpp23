@@ -321,8 +321,7 @@ class zip_view : public view_interface<zip_view<Views...>> {
         return x.current_ == y.current_;
       else
         return zip_transform_fold<sizeof...(Views)>(
-          [](const auto& x, const auto& y) { return bool(x == y); },
-          [](auto... equals) { return (equals || ...); }, x.current_, y.current_);
+          std::equal_to{}, [](auto... equals) { return (equals || ...); }, x.current_, y.current_);
     }
 
     friend constexpr auto
@@ -357,9 +356,10 @@ class zip_view : public view_interface<zip_view<Views...>> {
                           maybe_const_iterator_t<Const, Views>> &&
        ...)) {
       return zip_transform_fold<sizeof...(Views)>(
-        [](const auto& x, const auto& y) { return difference_type(x - y); },
+        std::minus{},
         [](auto... dists) {
-          return ranges::min({dists...}, {}, [](auto dist) { return std::abs(dist); });
+          return ranges::min({difference_type(dists)...}, {},
+                             [](auto dist) { return std::abs(dist); });
         },
         x.current_, y.current_);
     }
@@ -412,8 +412,7 @@ class zip_view : public view_interface<zip_view<Views...>> {
     friend constexpr bool
     operator==(const iterator<OtherConst>& x, const sentinel& y) {
       return zip_transform_fold<sizeof...(Views)>(
-        [](const auto& x, const auto& y) { return bool(x == y); },
-        [](auto... equals) { return (equals || ...); }, y.get_current(x), y.end_);
+        std::equal_to{}, [](auto... equals) { return (equals || ...); }, y.get_current(x), y.end_);
     }
 
     template<bool OtherConst>
@@ -424,9 +423,9 @@ class zip_view : public view_interface<zip_view<Views...>> {
     operator-(const iterator<OtherConst>& x, const sentinel& y) {
       using D = common_type_t<maybe_const_difference_t<OtherConst, Views>...>;
       return zip_transform_fold<sizeof...(Views)>(
-        [](const auto& x, const auto& y) { return D(x - y); },
+        std::minus{},
         [](auto... dists) {
-          return ranges::min({dists...}, {}, [](auto dist) { return std::abs(dist); });
+          return ranges::min({D(dists)...}, {}, [](auto dist) { return std::abs(dist); });
         },
         y.get_current(x), y.end_);
     }
@@ -448,8 +447,6 @@ class zip_view : public view_interface<zip_view<Views...>> {
   }
 
  public:
-  zip_view() = default;
-
   constexpr explicit zip_view(Views... views) : views_(std::move(views)...) { }
 
   constexpr auto
@@ -508,12 +505,18 @@ zip_view(Rs&&...) -> zip_view<views::all_t<Rs>...>;
 
 namespace views {
 
-inline constexpr auto zip = []<viewable_range... Rs>(Rs && ... rs) {
-  if constexpr (sizeof...(Rs) == 0)
-    return views::empty<tuple<>>;
-  else
-    return zip_view<all_t<Rs>...>(std::forward<Rs>(rs)...);
+struct Zip {
+  template<viewable_range... Rs>
+  constexpr auto
+  operator()(Rs&&... rs) const {
+    if constexpr (sizeof...(Rs) == 0)
+      return views::empty<tuple<>>;
+    else
+      return zip_view<all_t<Rs>...>(std::forward<Rs>(rs)...);
+  }
 };
+
+inline constexpr Zip zip;
 
 }  // namespace views
 
@@ -720,8 +723,6 @@ class zip_transform_view : public view_interface<zip_transform_view<F, Views...>
   };
 
  public:
-  zip_transform_view() = default;
-
   constexpr explicit zip_transform_view(F fun, Views... views)
     : fun_(std::move(fun)), zip_(std::move(views)...) { }
 
@@ -769,12 +770,18 @@ zip_transform_view(F, Rs&&...) -> zip_transform_view<F, views::all_t<Rs>...>;
 
 namespace views {
 
-inline constexpr auto zip_transform = []<class F, viewable_range... Rs>(F&& f, Rs&&... rs) {
-  if constexpr (sizeof...(Rs) == 0)
-    return views::empty<decay_t<invoke_result_t<decay_t<F>&>>>;
-  else
-    return zip_transform_view(std::forward<F>(f), std::forward<Rs>(rs)...);
+struct ZipTransform {
+  template<class F, viewable_range... Rs>
+  constexpr auto
+  operator()(F&& f, Rs&&... rs) const {
+    if constexpr (sizeof...(Rs) == 0)
+      return views::empty<decay_t<invoke_result_t<decay_t<F>&>>>;
+    else
+      return zip_transform_view(std::forward<F>(f), std::forward<Rs>(rs)...);
+  }
 };
+
+inline constexpr ZipTransform zip_transform;
 
 }  // namespace views
 
@@ -2508,17 +2515,13 @@ class stride_view : public view_interface<stride_view<V>> {
   V base_;
   range_difference_t<V> stride_;
 
-  template<bool Const>
-  using Base = maybe_const<Const, V>;
+  template<class Base>
+  struct iter_cat_base { };
 
-  template<bool Const>
-  struct stride_view_iter_cat { };
-
-  template<bool Const>
-    requires forward_range<Base<Const>>
-  struct stride_view_iter_cat<Const> {
+  template<forward_range Base>
+  struct iter_cat_base<Base> {
     using iterator_category = decltype([] {
-      using C = iterator_traits<iterator_t<Base<Const>>>::iterator_category;
+      using C = iterator_traits<iterator_t<Base>>::iterator_category;
       if constexpr (derived_from<C, random_access_iterator_tag>)
         return random_access_iterator_tag{};
       else
@@ -2527,9 +2530,9 @@ class stride_view : public view_interface<stride_view<V>> {
   };
 
   template<bool Const>
-  class iterator : public stride_view_iter_cat<Const> {
+  class iterator : public iter_cat_base<maybe_const<Const, V>> {
     using Parent = maybe_const<Const, stride_view>;
-    using Base = stride_view::Base<Const>;
+    using Base = maybe_const<Const, V>;
 
     iterator_t<Base> current_ = iterator_t<Base>();
     sentinel_t<Base> end_ = sentinel_t<Base>();
@@ -2558,14 +2561,14 @@ class stride_view : public view_interface<stride_view<V>> {
         return input_iterator_tag{};
     }());
 
-    using value_type = range_difference_t<Base>;
+    using value_type = range_value_t<Base>;
     using difference_type = range_difference_t<Base>;
 
     iterator() requires(default_initializable<iterator_t<Base>>) = default;
 
     constexpr iterator(iterator<!Const> i) requires Const &&
-      (convertible_to<iterator_t<V>, iterator_t<Base>>&&
-         convertible_to<sentinel_t<V>, sentinel_t<Base>>)
+      ((convertible_to<iterator_t<V>, iterator_t<Base>> &&
+        convertible_to<sentinel_t<V>, sentinel_t<Base>>))
       : current_(std::move(i.current_)),
         end_(std::move(i.end_)),
         stride_(i.stride_),
@@ -2775,10 +2778,10 @@ class stride_view : public view_interface<stride_view<V>> {
 
   constexpr auto
   end() const requires range<const V> {
-    if constexpr (common_range<V> && sized_range<V> && forward_range<V>) {
+    if constexpr (common_range<const V> && sized_range<const V> && forward_range<const V>) {
       auto missing = (stride_ - std::ranges::distance(base_) % stride_) % stride_;
       return iterator<true>(this, ranges::end(base_), missing);
-    } else if constexpr (common_range<V> && !bidirectional_range<V>)
+    } else if constexpr (common_range<const V> && !bidirectional_range<const V>)
       return iterator<true>(this, ranges::end(base_));
     else
       return std::default_sentinel;
@@ -3157,7 +3160,6 @@ struct input_iter {
   using reference = range_reference_t<R>;
   reference operator*() const;
   pointer operator->() const;
-  input_iter& operator++();
   input_iter operator++(int);
   bool operator==(const input_iter&) const;
 };
